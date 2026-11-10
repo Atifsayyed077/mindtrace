@@ -1,0 +1,12 @@
+# Normalize line endings (avoid OS-specific churn)
+* text=auto
+
+# Windows scripts
+*.ps1 text eol=crlf
+
+# Never normalize these
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
