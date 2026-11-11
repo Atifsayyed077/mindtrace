@@ -45,7 +45,15 @@ export function TopNav() {
         const { data } = await supabase.auth.getUser();
         if (!alive || !data?.user) return;
         setAuthed(true);
-        const nm = String(data.user.user_metadata?.name ?? "").trim();
+        /* Name source of truth: auth metadata (set at signup). Accounts created
+           before that fix have empty metadata, so fall back to the profiles row. */
+        let nm = String(data.user.user_metadata?.name ?? "").trim();
+        if (!nm) {
+          try {
+            const { data: prof } = await supabase.from("profiles").select("full_name").maybeSingle();
+            if (prof?.full_name) nm = String(prof.full_name).trim();
+          } catch { /* schema not initialized yet — no greeting until profile is saved */ }
+        }
         if (nm) setFirstName(nm.split(/\s+/)[0]);
       } catch { /* stay on logged-out variant */ }
     })();
