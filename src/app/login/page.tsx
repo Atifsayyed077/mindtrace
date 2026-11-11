@@ -1,117 +1,29 @@
-"use client";
+import { redirect } from "next/navigation";
+import { createClient } from "@/utils/supabase/server";
+import { safeNext } from "@/lib/auth";
+import { LoginForm } from "./login-form";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { AuthShell, AuthAlert, ResendConfirmation } from "@/components/auth-shell";
-import { createClient } from "@/utils/supabase/client";
-import { authErrorText, authErrPayload, safeNext } from "@/lib/auth";
+/**
+ * Login page (server-rendered).
+ * - Reads ?next= / ?e= server-side (Next 16: searchParams is a Promise) and
+ *   passes them as props — no useSearchParams, so the form is in the HTML.
+ * - Already signed in? Skip the form entirely and go straight to where the
+ *   user was heading (or the dashboard) — the app "knows you already have
+ *   an account".
+ */
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const sp = await searchParams;
+  const rawNext = Array.isArray(sp.next) ? sp.next[0] : sp.next;
+  const rawTag = Array.isArray(sp.e) ? sp.e[0] : sp.e;
+  const next = safeNext(rawNext ?? "");
 
-const TAG_COPY: Record<string, string> = {
-  link_problem: "That confirmation link looked invalid or has expired. Just log in below — or request a fresh link.",
-  missing_code: "That link was incomplete. If your email is already confirmed, log in below.",
-  email_not_confirmed: "Please confirm your email first — the link in your inbox (check spam too).",
-  server_error: "The sign-in service hiccuped. Please try again in a moment.",
-};
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (data?.user) redirect(next);
 
-function LoginForm() {
-  const nav = useRouter();
-  const sp = useSearchParams();
-  const next = safeNext(sp.get("next"));
-  const tagKey = sp.get("e") ?? "";
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>(tagKey && TAG_COPY[tagKey] ? TAG_COPY[tagKey] : "");
-  const [showResend, setShowResend] = useState(false);
-
-  async function submit(ev: React.FormEvent) {
-    ev.preventDefault();
-    setBusy(true);
-    setError("");
-    setShowResend(false);
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      if (error || !data.session) {
-        const p = authErrPayload(error ?? undefined);
-        if (p.code === "email_not_confirmed") {
-          setError(TAG_COPY.email_not_confirmed);
-          setShowResend(true); // offer the fresh link here
-        } else {
-          setShowResend(false);
-          setError(authErrorText(p.code, p.message));
-        }
-        setBusy(false);
-        return;
-      }
-      nav.replace(next);
-    } catch {
-      setError("Network trouble reaching the auth service. Please retry.");
-      setBusy(false);
-    }
-  }
-
-  return (
-    <AuthShell
-      mood="happy"
-      title="Welcome back"
-      sub="Pick up your journey exactly where your brain left it."
-    >
-      <form onSubmit={submit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="text-sm font-semibold text-ink">Email</label>
-          <input
-            id="email"
-            type="email"
-            required
-            autoComplete="email"
-            className="field w-full mt-1.5"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="text-sm font-semibold text-ink">Password</label>
-          <input
-            id="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="field w-full mt-1.5"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        {error && <AuthAlert tone="error">{error}</AuthAlert>}
-        {showResend && (
-          <div className="mt-4">
-            <ResendConfirmation email={email.trim().toLowerCase()} />
-          </div>
-        )}
-        <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-          {busy ? "Checking credentials…" : "Log in"}
-        </button>
-      </form>
-
-      <div className="flex items-center justify-between mt-5 text-sm">
-        <Link href="/forgot-password" className="text-navy-700 underline hover:text-lav-500">Forgot password?</Link>
-        <Link href="/signup" className="text-navy-700 underline hover:text-lav-500">Create an account →</Link>
-      </div>
-    </AuthShell>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
-  );
+  return <LoginForm next={next} tag={rawTag ?? ""} />;
 }
