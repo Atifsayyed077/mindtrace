@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Neuro, NEURO_QUOTES } from "./neuro";
 import { Icon } from "./icons";
+import { createClient } from "@/utils/supabase/client";
 
 /* gate: waits for mount so localStorage reads never mismatch SSR */
 export function ClientGate({ children, skeleton = true }: { children: React.ReactNode; skeleton?: boolean }) {
@@ -28,9 +29,27 @@ export function TopNav() {
      is swapped in after mount. (Math.random() during the SSR/hydration pass
      causes server/client text mismatches.) */
   const [quote, setQuote] = useState(NEURO_QUOTES[0] ?? "");
+  /* Hydration-safe auth state: SSR renders the logged-out variant (Log in /
+     Sign up); after mount the real session is checked and, if present, the
+     app links + a first-name greeting (from auth metadata set at signup)
+     replace it. Session persists across visits until explicit sign-out. */
+  const [authed, setAuthed] = useState(false);
+  const [firstName, setFirstName] = useState("");
   useEffect(() => {
     const next = NEURO_QUOTES[Math.floor(Math.random() * NEURO_QUOTES.length)] ?? NEURO_QUOTES[0];
     if (next) setQuote(next);
+    let alive = true;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        if (!alive || !data?.user) return;
+        setAuthed(true);
+        const nm = String(data.user.user_metadata?.name ?? "").trim();
+        if (nm) setFirstName(nm.split(/\s+/)[0]);
+      } catch { /* stay on logged-out variant */ }
+    })();
+    return () => { alive = false; };
   }, []);
   return (
     <header className="sticky top-0 z-50 backdrop-blur-lg bg-white/75 border-b border-lav-100 no-print">
@@ -45,15 +64,39 @@ export function TopNav() {
           </span>
         </Link>
         <nav className="hidden sm:flex items-center gap-1 text-sm font-medium text-ink-muted">
-          <Link href="/dashboard" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Dashboard</Link>
-          <Link href="/profile" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Profile</Link>
-          <Link href="/journey" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Today</Link>
-          <Link href="/report" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Report</Link>
-          <Link href="/verify" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Verify</Link>
+          {authed ? (
+            <>
+              <Link href="/dashboard" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Dashboard</Link>
+              <Link href="/profile" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Profile</Link>
+              <Link href="/journey" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Today</Link>
+              <Link href="/report" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Report</Link>
+              <Link href="/verify" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Verify</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Log in</Link>
+              <Link href="/signup" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Sign up</Link>
+              <Link href="/verify" className="px-3.5 py-2 rounded-full hover:bg-lav-100 transition-colors">Verify</Link>
+            </>
+          )}
         </nav>
         <div className="flex items-center gap-2">
           <span className="hidden lg:block text-xs text-ink-faint max-w-[240px] truncate" title={quote}>{quote}</span>
-          <Link href="/onboarding" className="btn btn-primary !py-2 !px-4 text-[0.85rem]">Start journey</Link>
+          {authed ? (
+            <>
+              {firstName && (
+                <span className="hidden md:block text-xs font-semibold text-navy-700 bg-lav-100 rounded-full px-3 py-1.5">
+                  Hi, {firstName}
+                </span>
+              )}
+              <Link href="/onboarding" className="btn btn-primary !py-2 !px-4 text-[0.85rem]">Start journey</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="btn btn-ghost !py-2 !px-4 text-[0.85rem]">Log in</Link>
+              <Link href="/signup" className="btn btn-primary !py-2 !px-4 text-[0.85rem]">Sign up</Link>
+            </>
+          )}
         </div>
       </div>
     </header>

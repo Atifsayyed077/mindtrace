@@ -48,7 +48,10 @@ export default function SignupPage() {
         email: email.trim().toLowerCase(),
         password,
         options: {
-          // Seeds the journey context; the profiles row is created server-side.
+          // Profile creation happens at account creation: the DB trigger
+          // handle_new_user reads this metadata and writes profiles.full_name.
+          // (Nothing sensitive here — full_name only, never credentials.)
+          data: { name: name.trim() },
         },
       });
 

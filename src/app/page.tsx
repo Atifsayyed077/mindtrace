@@ -39,6 +39,12 @@ function LandingHero() {
             </Link>
             <a href="#how" className="btn btn-ghost text-[1rem] px-7">Discover How It Works</a>
           </div>
+          <p className="text-sm text-ink-muted mt-5 animate-rise" style={{ animationDelay: "280ms" }}>
+            Already have an account?{" "}
+            <Link href="/login" className="text-navy-700 underline hover:text-lav-500">Log in</Link>
+            <span className="text-ink-faint"> · </span>
+            <Link href="/signup" className="text-navy-700 underline hover:text-lav-500">Sign up</Link>
+          </p>
 
           <div className="mt-12 flex items-center justify-center gap-4 animate-rise" style={{ animationDelay: "330ms" }}>
             <div className="animate-floaty"><Neuro size={140} mood="happy" /></div>
@@ -247,6 +253,8 @@ function FooterMini() {
           <span>· understand yourself, one day at a time</span>
         </div>
         <nav className="flex gap-4">
+          <Link href="/login" className="hover:text-ink transition-colors">Log in</Link>
+          <Link href="/signup" className="hover:text-ink transition-colors">Sign up</Link>
           <Link href="/verify" className="hover:text-ink transition-colors">Verify certificate</Link>
           <Link href="/admin" className="hover:text-ink transition-colors">Admin</Link>
           <a href="tel:14416" className="hover:text-ink transition-colors">Help: 14416</a>
