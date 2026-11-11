@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthShell, AuthAlert, ResendConfirmation } from "@/components/auth-shell";
 import { createClient } from "@/utils/supabase/client";
+import { ensureMyProfileAction } from "@/app/actions/profile";
 import { authErrorText, authErrPayload } from "@/lib/auth";
 
 const TAG_COPY: Record<string, string> = {
@@ -53,6 +54,9 @@ export function LoginForm({ next, tag }: { next: string; tag: string }) {
         setBusy(false);
         return;
       }
+      /* Make sure the account has a profile row (no-op if one exists;
+         silently skipped if the tables aren't ready yet). Non-fatal. */
+      try { await ensureMyProfileAction(); } catch { /* non-fatal */ }
       nav.replace(next);
     } catch {
       setError("Network trouble reaching the auth service. Please retry.");

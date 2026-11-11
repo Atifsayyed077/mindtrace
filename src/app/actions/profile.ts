@@ -37,6 +37,37 @@ async function requireAuthedClient() {
   return { supabase, user: { id: data.user.id, email: data.user.email ?? undefined } };
 }
 
+/**
+ * Ensure the caller's own profile row exists (idempotent, no-op if present).
+ * Called right after a successful login: covers accounts created BEFORE the
+ * handle_new_user trigger existed (their signup never made a row), so there
+ * is always a row to greet and to update. Never touches credentials.
+ */
+export async function ensureMyProfileAction(): Promise<ActionOk<ProfileRow | null> | ActionErr> {
+  const { supabase, user } = await requireAuthedClient();
+  if (!user) return { ok: false, error: "AUTH_REQUIRED" };
+
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ id: user.id, full_name: "" }, { onConflict: "id", ignoreDuplicates: true });
+
+  if (error) {
+    if (error.code === "PGRST205" || /could not find the table/i.test(error.message)) {
+      console.info("[ensureProfile] backend tables not created yet — skipping silently.");
+      return { ok: false, error: "DB", detail: "schema-missing" };
+    }
+    console.error("[ensureProfile] db error:", error.code);
+    return { ok: false, error: "DB" };
+  }
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+  return { ok: true, data: (data as ProfileRow | null) ?? null };
+}
+
 /** Create or update the caller's own profile row (idempotent upsert). */
 export async function saveProfileAction(input: unknown): Promise<ProfileActionResult> {
   const parsed = saveProfileSchema.safeParse(input);
